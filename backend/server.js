@@ -47,8 +47,6 @@ const rpcUrls = {
 
 const tokenAbi = [
   'function balanceOf(address) view returns (uint256)',
-  'function symbol() view returns (string)',
-  'function name() view returns (string)',
   'function decimals() view returns (uint8)'
 ];
 
