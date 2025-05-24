@@ -5,10 +5,9 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: '*' })); // Izinkan semua origin, ganti ke spesifik kalau live
 app.use(express.json());
 
-// Map frontend network ke backend
 const networkMap = {
   poly: 'matic',
   bnb: 'bsc',
@@ -191,7 +190,8 @@ const popularTokens = {
 
 const getProvider = async (network) => {
   const mappedNetwork = networkMap[network] || network;
-  for (const url of rpcUrls[mappedNetwork] || []) {
+  const urls = rpcUrls[mappedNetwork] || [];
+  for (const url of urls) {
     try {
       const provider = new ethers.JsonRpcProvider(url);
       await Promise.race([
@@ -271,7 +271,7 @@ const getTokensFromExplorer = async (network, address) => {
 
 app.get('/getBalance', async (req, res) => {
   const { address, network, contracts } = req.query;
-  console.log(`Received: address=${address}, network=${network}, contracts=${contracts}`);
+  console.log(`Request received: address=${address}, network=${network}, contracts=${contracts}`);
 
   try {
     if (network === 'sol') {
