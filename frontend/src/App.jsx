@@ -40,7 +40,9 @@ function App() {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('wallets') || '[]');
-    setSavedWallets(saved.map((addr, i) => ({ address: addr, name: `Wallet ${i + 1}` })));
+    const wallets = saved.map((addr, i) => ({ address: addr, name: `Wallet ${i + 1}` }));
+    setSavedWallets(wallets);
+    console.log('Loaded wallets from localStorage:', wallets);
   }, []);
 
   const handleChainChange = (chain) => {
@@ -59,6 +61,7 @@ function App() {
     const updatedWallets = [...savedWallets, ...newWallets];
     setSavedWallets(updatedWallets);
     localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
+    console.log('Saved wallets to localStorage:', updatedWallets);
     setWalletInput('');
   };
 
@@ -68,6 +71,7 @@ function App() {
       .map((w, i) => ({ ...w, name: `Wallet ${i + 1}` }));
     setSavedWallets(updatedWallets);
     localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
+    console.log('Deleted wallet:', address, 'New wallets:', updatedWallets);
     if (selectedWallet?.toLowerCase() === address.toLowerCase()) {
       setSelectedWallet(null);
       setBalances([]);
@@ -75,10 +79,14 @@ function App() {
   };
 
   const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+    console.log('Fetching:', url);
     for (let i = 0; i < retries; i++) {
       try {
-        const res = await fetch(url, { mode: 'cors' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(url, {
+          mode: 'cors',
+          signal: AbortSignal.timeout(15000)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         return await res.json();
       } catch (error) {
         console.log(`Fetch attempt ${i + 1} failed:`, error.message);
@@ -110,10 +118,10 @@ function App() {
         const url = `https://checkerevmsol-backend.vercel.app/getBalance?address=${walletAddr}&network=${chain}${contractsParam}`;
         const data = await fetchWithRetry(url);
         if (data.error) throw new Error(data.error);
-        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || walletAddr.slice(0, 6);
+        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || `Wallet ${walletAddr.slice(0, 6)}`;
         results.push({ wallet: walletAddr, walletName, chain, ...data });
       } catch (error) {
-        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || walletAddr.slice(0, 6);
+        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || `Wallet ${walletAddr.slice(0, 6)}`;
         results.push({ wallet: walletAddr, walletName, chain, error: error.message });
         setError(`Gagal fetch data untuk ${chain}: ${error.message}`);
       }
