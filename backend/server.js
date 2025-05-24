@@ -8,27 +8,46 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Map frontend network ke backend
+const networkMap = {
+  poly: 'matic',
+  bnb: 'bsc',
+  arb: 'arbitrum',
+  eth: 'eth',
+  avax: 'avax',
+  base: 'base',
+  sol: 'sol',
+  optimism: 'optimism',
+  sepolia: 'sepolia',
+  bsc_testnet: 'bsc_testnet',
+  mumbai: 'mumbai',
+  fuji: 'fuji'
+};
+
 const rpcUrls = {
   bsc: [
     'https://bsc-dataseed1.binance.org/',
     'https://rpc.ankr.com/bsc',
     'https://bsc.publicnode.com',
     'https://bsc-dataseed2.binance.org/',
-    'https://bsc-dataseed3.binance.org/'
+    'https://bsc-dataseed3.binance.org/',
+    'https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a91b1d0de0f'
   ],
   avax: [
     'https://api.avax.network/ext/bc/C/rpc',
     'https://rpc.ankr.com/avalanche',
     'https://avalanche.public-rpc.com',
     'https://avalanche-c-chain.publicnode.com',
-    'https://rpc.ankr.com/avalanche-c'
+    'https://rpc.ankr.com/avalanche-c',
+    'https://ava-mainnet.public.blastapi.io/ext/bc/C/rpc'
   ],
   matic: [
     'https://rpc-mainnet.maticvigil.com',
     'https://rpc.ankr.com/polygon',
     'https://polygon-rpc.com',
     'https://polygon-mainnet.g.alchemy.com/v2/demo',
-    'https://rpc-mainnet.matic.quiknode.pro'
+    'https://rpc-mainnet.matic.quiknode.pro',
+    'https://matic-mainnet.chainstacklabs.com'
   ],
   base: [
     'https://mainnet.base.org',
@@ -41,8 +60,8 @@ const rpcUrls = {
     'https://rpc.ankr.com/eth',
     'https://ethereum.publicnode.com',
     'https://eth.llamarpc.com',
-    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY', // Ganti kalau punya
-    'https://eth-mainnet.g.alchemy.com/v2/demo'
+    'https://eth-mainnet.g.alchemy.com/v2/demo',
+    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
   ],
   optimism: [
     'https://mainnet.optimism.io',
@@ -155,7 +174,7 @@ const popularTokens = {
   avax: [
     { address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', name: 'USDC' }
   ],
-  bnb: [
+  bsc: [
     { address: '0x55d398326f99059fF775485246999027B3197955', name: 'USDT' }
   ],
   base: [
@@ -171,7 +190,8 @@ const popularTokens = {
 };
 
 const getProvider = async (network) => {
-  for (const url of rpcUrls[network]) {
+  const mappedNetwork = networkMap[network] || network;
+  for (const url of rpcUrls[mappedNetwork] || []) {
     try {
       const provider = new ethers.JsonRpcProvider(url);
       await Promise.race([
@@ -181,20 +201,22 @@ const getProvider = async (network) => {
       console.log(`Connected to RPC: ${url}`);
       return provider;
     } catch (error) {
-      console.log(`Failed RPC ${url} for ${network}:`, error.message);
+      console.log(`Failed RPC ${url} for ${mappedNetwork}:`, error.message);
       continue;
     }
   }
-  throw new Error(`No available RPC for ${network}`);
+  throw new Error(`No available RPC for ${mappedNetwork}`);
 };
 
 const getApiKey = (network) => {
-  const keys = apiKeys[network] || [];
+  const mappedNetwork = networkMap[network] || network;
+  const keys = apiKeys[mappedNetwork] || [];
   return keys[Math.floor(Math.random() * keys.length)] || '';
 };
 
 const getTokensFromExplorer = async (network, address) => {
-  const explorerUrl = explorers[network];
+  const mappedNetwork = networkMap[network] || network;
+  const explorerUrl = explorers[mappedNetwork];
   const apiKey = getApiKey(network);
   if (!explorerUrl || !apiKey) return [];
 
@@ -242,7 +264,7 @@ const getTokensFromExplorer = async (network, address) => {
     }
     return tokens;
   } catch (error) {
-    console.log(`Error fetching tokens from ${network} explorer:`, error.message);
+    console.log(`Error fetching tokens from ${mappedNetwork} explorer:`, error.message);
     return [];
   }
 };
@@ -299,7 +321,8 @@ app.get('/getBalance', async (req, res) => {
     tokens = await getTokensFromExplorer(network, address);
 
     // Check popular tokens (fallback)
-    const chainTokens = popularTokens[network] || [];
+    const mappedNetwork = networkMap[network] || network;
+    const chainTokens = popularTokens[mappedNetwork] || [];
     for (const token of chainTokens) {
       if (!tokens.some((t) => t.name === token.name)) {
         try {
