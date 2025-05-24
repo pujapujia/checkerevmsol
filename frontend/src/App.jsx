@@ -26,6 +26,7 @@ function App() {
     sol: false
   });
   const [walletInput, setWalletInput] = useState('');
+  const [contractInput, setContractInput] = useState('');
   const [wallets, setWallets] = useState([]);
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -53,11 +54,13 @@ function App() {
 
   const fetchBalances = async (walletList) => {
     const selectedChains = Object.keys(chains).filter(c => chains[c]);
+    const contractList = contractInput.split('\n').map(c => c.trim()).filter(c => c);
     const results = [];
 
     for (const wallet of walletList) {
       for (const chain of selectedChains) {
         try {
+          const contractsParam = contractList.length > 0 ? `&contracts=${contractList.join(',')}` : '';
           const res = await fetch(`https://checkerevmsol-e8j2.vercel.app/getBalance?address=${wallet}&network=${chain}`);
           const data = await res.json();
           if (data.error) throw new Error(data.error);
@@ -95,6 +98,13 @@ function App() {
           value={walletInput}
           onChange={(e) => setWalletInput(e.target.value)}
         />
+        <textarea
+          className="w-full p-2 font-mono bg-gray-100 border rounded mb-4"
+          rows="3"
+          placeholder="Paste contract address(es) here, one per line (optional)"
+          value={contractInput}
+          onChange={(e) => setContractInput(e.target.value)}
+        />
         <button
           className="bg-blue-500 text-white px-4 py-2 rounded"
           onClick={saveWallets}
@@ -118,6 +128,7 @@ function App() {
                     {b.tokens.map((t, j) => (
                       <li key={j}>- {t.name}: {t.balance}</li>
                     ))}
+                    {b.tokens.length === 0 && <li>No tokens detected</li>}
                   </ul>
                 </>
               )}
