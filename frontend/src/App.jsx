@@ -11,7 +11,7 @@ function ErrorBoundary({ children }) {
     window.addEventListener('error', errorHandler);
     return () => window.removeEventListener('error', errorHandler);
   }, []);
-  if (hasError) return <h1>Something went wrong. Check console.</h1>;
+  if (hasError) return <h1 className="text-white text-center mt-10">Something went wrong. Check console.</h1>;
   return children;
 }
 
@@ -61,7 +61,7 @@ function App() {
       for (const chain of selectedChains) {
         try {
           const contractsParam = contractList.length > 0 ? `&contracts=${contractList.join(',')}` : '';
-          const res = await fetch(`https://checkerevmsol-e8j2.vercel.app/getBalance?address=${wallet}&network=${chain}`);
+          const res = await fetch(`https://checkerevmsol-e8j2.vercel.app/getBalance?address=${wallet}&network=${chain}${contractsParam}`);
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           results.push({ wallet, chain, ...data });
@@ -76,67 +76,71 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="p-4 max-w-4xl mx-auto font-sans">
-        <div className="flex flex-wrap gap-4 mb-4">
-          {['arb', 'eth', 'bnb', 'avax', 'poly', 'base', 'sol'].map(chain => (
-            <label key={chain} className="flex items-center">
-              <input
-                type="checkbox"
-                checked={chains[chain]}
-                onChange={() => handleChainChange(chain)}
-                className="mr-2"
-              />
-              <span className="uppercase">{chain}</span>
-            </label>
-          ))}
-        </div>
-        <hr className="my-4 border-gray-300" />
-        <textarea
-          className="w-full p-2 font-mono bg-gray-100 border rounded mb-4"
-          rows="5"
-          placeholder="Paste wallet address(es) here, one per line"
-          value={walletInput}
-          onChange={(e) => setWalletInput(e.target.value)}
-        />
-        <textarea
-          className="w-full p-2 font-mono bg-gray-100 border rounded mb-4"
-          rows="3"
-          placeholder="Paste contract address(es) for custom tokens, one per line (optional)"
-          value={contractInput}
-          onChange={(e) => setContractInput(e.target.value)}
-        />
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={saveWallets}
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Save & Cek Saldo'}
-        </button>
-        <hr className="my-4 border-gray-300" />
-        <div className="font-mono bg-gray-100 p-4 rounded">
-          {balances.map((b, i) => (
-            <div key={i} className="mb-4">
-              <p><strong>Jaringan:</strong> {b.chain.toUpperCase()}</p>
-              <p><strong>Wallet:</strong> {b.wallet}</p>
-              {b.error ? (
-                <p><strong>Error:</strong> {b.error}</p>
-              ) : (
-                <>
-                  <p><strong>Saldo Native:</strong> {b.native} {b.chain === 'sol' ? 'SOL' : b.chain === 'poly' ? 'MATIC' : b.chain.toUpperCase()}</p>
-                  <p><strong>Token:</strong></p>
-                  <ul>
-                    {b.tokens.length > 0 ? (
-                      b.tokens.map((t, j) => (
-                        <li key={j}>- {t.name}: {t.balance}</li>
-                      ))
-                    ) : (
-                      <li>No tokens detected</li>
-                    )}
-                  </ul>
-                </>
-              )}
-            </div>
-          ))}
+      <div className="min-h-screen bg-gray-900 text-white p-6 font-mono">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-2xl font-bold mb-6 text-center">Balance Checker</h1>
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {['arb', 'eth', 'bnb', 'avax', 'poly', 'base', 'sol'].map(chain => (
+              <label key={chain} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={chains[chain]}
+                  onChange={() => handleChainChange(chain)}
+                  className="h-5 w-5 text-gray-600 rounded focus:ring-gray-500"
+                />
+                <span className="uppercase text-sm text-gray-300">{chain}</span>
+              </label>
+            ))}
+          </div>
+          <hr className="my-6 border-gray-700" />
+          <textarea
+            className="w-full p-3 bg-gray-800 text-white border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200"
+            rows="5"
+            placeholder="Masukkan alamat wallet, satu per baris"
+            value={walletInput}
+            onChange={(e) => setWalletInput(e.target.value)}
+          />
+          <textarea
+            className="w-full p-3 bg-gray-800 text-white border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200"
+            rows="3"
+            placeholder="Masukkan alamat kontrak custom (opsional), satu per baris"
+            value={contractInput}
+            onChange={(e) => setContractInput(e.target.value)}
+          />
+          <button
+            className={`w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-600 transition duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={saveWallets}
+            disabled={loading}
+          >
+            {loading ? 'Memuat...' : 'Simpan & Cek Saldo'}
+          </button>
+          <hr className="my-6 border-gray-700" />
+          <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
+            {balances.length === 0 && <p className="text-gray-400">Belum ada data saldo.</p>}
+            {balances.map((b, i) => (
+              <div key={i} className="mb-4 animate-fade-in">
+                <p><strong>Jaringan:</strong> <span className="text-gray-300">{b.chain.toUpperCase()}</span></p>
+                <p><strong>Wallet:</strong> <span className="text-gray-300 break-all">{b.wallet}</span></p>
+                {b.error ? (
+                  <p><strong>Error:</strong> <span className="text-red-400">{b.error}</span></p>
+                ) : (
+                  <>
+                    <p><strong>Saldo Native:</strong> <span className="text-gray-300">{b.native} {b.chain === 'sol' ? 'SOL' : b.chain === 'poly' ? 'MATIC' : b.chain.toUpperCase()}</span></p>
+                    <p><strong>Token:</strong></p>
+                    <ul className="list-disc pl-5">
+                      {b.tokens.length > 0 ? (
+                        b.tokens.map((t, j) => (
+                          <li key={j} className="text-gray-300">- {t.name}: {t.balance}</li>
+                        ))
+                      ) : (
+                        <li className="text-gray-400">Tidak ada token terdeteksi</li>
+                      )}
+                    </ul>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </ErrorBoundary>
