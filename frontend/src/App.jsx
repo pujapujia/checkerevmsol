@@ -36,6 +36,7 @@ function App() {
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('wallets') || '[]');
@@ -61,23 +62,44 @@ function App() {
     setWalletInput('');
   };
 
+  const deleteWallet = (address) => {
+    const updatedWallets = savedWallets
+      .filter((w) => w.address !== address)
+      .map((w, i) => ({ ...w, name: `Wallet ${i + 1}` }));
+    setSavedWallets(updatedWallets);
+    localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
+    if (selectedWallet === address) {
+      setSelectedWallet(null);
+      setBalances([]);
+    }
+  };
+
   const checkBalance = async (walletAddr) => {
     setSelectedWallet(walletAddr);
     setLoading(true);
+    setError('');
     const selectedChains = Object.keys(chains).filter((c) => chains[c]);
+    if (selectedChains.length === 0) {
+      setError('Pilih minimal satu jaringan!');
+      setLoading(false);
+      return;
+    }
     const contractList = contractInput.split('\n').map((c) => c.trim()).filter((c) => c);
     const results = [];
 
     for (const chain of selectedChains) {
       try {
         const contractsParam = contractList.length > 0 ? `&contracts=${contractList.join(',')}` : '';
-        const res = await fetch(`https://checkerevmsol-backend.vercel.app/getBalance?address=${walletAddr}&network=${chain}${contractsParam}`);
+        const res = await fetch(`https://checkerevmsol-backend.vercel.app/getBalance?address=${walletAddr}&network=${chain}${contractsParam}`, {
+          mode: 'cors'
+        });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         const walletName = savedWallets.find((w) => w.address === walletAddr)?.name || 'Unknown';
         results.push({ wallet: walletAddr, walletName, chain, ...data });
       } catch (error) {
         results.push({ wallet: walletAddr, walletName: 'Unknown', chain, error: error.message });
+        setError(`Gagal fetch data untuk ${chain}: ${error.message}`);
       }
     }
 
@@ -110,13 +132,21 @@ function App() {
             savedWallets.map((wallet) => (
               <div
                 key={wallet.address}
-                className={`p-2 mb-2 rounded-lg cursor-pointer transition duration-200 ${
-                  selectedWallet === wallet.address ? 'bg-gray-600' : 'hover:bg-gray-700'
-                }`}
-                onClick={() => checkBalance(wallet.address)}
+                className="flex items-center justify-between p-2 mb-2 rounded-lg cursor-pointer transition duration-200 hover:bg-gray-700"
               >
-                <p className="text-gray-300 break-all">{wallet.name}</p>
-                <p className="text-sm text-gray-400 break-all">{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}</p>
+                <div
+                  className={`flex-1 ${selectedWallet === wallet.address ? 'bg-gray-600' : ''}`}
+                  onClick={() => checkBalance(wallet.address)}
+                >
+                  <p className="text-gray-300 break-all">{wallet.name}</p>
+                  <p className="text-sm text-gray-400 break-all">{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}</p>
+                </div>
+                <button
+                  className="ml-2 text-red-400 hover:text-red-300"
+                  onClick={() => deleteWallet(wallet.address)}
+                >
+                  X
+                </button>
               </div>
             ))
           )}
@@ -145,6 +175,7 @@ function App() {
             value={contractInput}
             onChange={(e) => setContractInput(e.target.value)}
           />
+          {error && <p className="text-red-400 mb-4">{error}</p>}
           <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
             {balances.length === 0 && <p className="text-gray-400">Pilih wallet untuk cek saldo.</p>}
             {loading && <p className="text-gray-400">Memuat...</p>}
