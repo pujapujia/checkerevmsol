@@ -5,7 +5,7 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors({ origin: '*' })); // Wildcard buat debug, ganti ke spesifik kalau stabil
+app.use(cors({ origin: '*' })); // Wildcard buat debug
 app.use(express.json());
 
 const networkMap = {
@@ -27,12 +27,14 @@ const rpcUrls = {
   bsc: [
     'https://bsc-dataseed1.binance.org/',
     'https://rpc.ankr.com/bsc',
-    'https://bsc.publicnode.com'
+    'https://bsc.publicnode.com',
+    'https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a91b1d0de0f'
   ],
   avax: [
     'https://api.avax.network/ext/bc/C/rpc',
     'https://rpc.ankr.com/avalanche',
-    'https://avalanche.public-rpc.com'
+    'https://avalanche.public-rpc.com',
+    'https://avalanche-c-chain.publicnode.com'
   ],
   matic: [
     'https://rpc-mainnet.maticvigil.com',
@@ -40,9 +42,8 @@ const rpcUrls = {
     'https://polygon-rpc.com',
     'https://poly-mainnet.rpc.grove.city/v1/803a2461',
     'https://polygon-mainnet.public.blastapi.io',
-    'https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY', // Ganti kalau punya
-    'https://polygon-mainnet.g.alchemy.com/v2/demo',
-    'https://matic-mainnet.chainstacklabs.com'
+    'https://matic-mainnet.chainstacklabs.com',
+    'https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
   ],
   base: [
     'https://mainnet.base.org',
@@ -52,7 +53,8 @@ const rpcUrls = {
   eth: [
     'https://rpc.ankr.com/eth',
     'https://ethereum.publicnode.com',
-    'https://eth.llamarpc.com'
+    'https://eth.llamarpc.com',
+    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
   ],
   optimism: [
     'https://mainnet.optimism.io',
@@ -82,7 +84,8 @@ const rpcUrls = {
   ],
   sol: [
     'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana'
+    'https://rpc.ankr.com/solana',
+    'https://solana-mainnet.rpc.extrnode.com'
   ]
 };
 
@@ -160,15 +163,15 @@ const getProvider = async (network, retries = 3) => {
           provider.getBlockNumber(),
           new Promise((_, reject) => setTimeout(() => reject(new Error(`RPC timeout: ${url}`)), 5000))
         ]);
-        console.log(`Connected to RPC: ${url} (attempt ${attempt})`);
+        console.log(`[SUCCESS] Connected to RPC: ${url} (attempt ${attempt})`);
         return provider;
       } catch (error) {
-        console.log(`Failed RPC ${url} for ${mappedNetwork} (attempt ${attempt}):`, error.message);
+        console.log(`[ERROR] Failed RPC ${url} for ${mappedNetwork} (attempt ${attempt}):`, error.message);
         continue;
       }
     }
     if (attempt < retries) {
-      console.log(`Retrying provider for ${mappedNetwork}...`);
+      console.log(`[INFO] Retrying provider for ${mappedNetwork}...`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
@@ -178,7 +181,9 @@ const getProvider = async (network, retries = 3) => {
 const getApiKey = (network) => {
   const mappedNetwork = networkMap[network] || network;
   const keys = apiKeys[mappedNetwork] || [];
-  return keys[Math.floor(Math.random() * keys.length)] || '';
+  const key = keys[Math.floor(Math.random() * keys.length)] || '';
+  console.log(`[INFO] Using API key for ${mappedNetwork}: ${key.slice(0, 6)}...`);
+  return key;
 };
 
 const getTokensFromExplorer = async (network, address) => {
@@ -186,7 +191,7 @@ const getTokensFromExplorer = async (network, address) => {
   const explorerUrl = explorers[mappedNetwork];
   const apiKey = getApiKey(network);
   if (!explorerUrl || !apiKey) {
-    console.log(`No explorer or API key for ${mappedNetwork}`);
+    console.log(`[ERROR] No explorer or API key for ${mappedNetwork}`);
     return [];
   }
 
@@ -199,14 +204,14 @@ const getTokensFromExplorer = async (network, address) => {
         action: 'tokentx',
         address,
         page: 1,
-        offset: 50, // Batasi buat cegah timeout
+        offset: 20,
         sort: 'desc',
         apikey: apiKey
       },
-      timeout: 10000
+      timeout: 8000
     });
 
-    console.log(`Polygonscan response for ${address} on ${mappedNetwork}:`, response.data.status);
+    console.log(`[INFO] Explorer response for ${address} on ${mappedNetwork}: status=${response.data.status}, message=${response.data.message}`);
 
     if (response.data.status === '1' && response.data.result) {
       const tokenContracts = new Set();
@@ -219,53 +224,54 @@ const getTokensFromExplorer = async (network, address) => {
             const decimals = await contract.decimals();
             const balanceFormatted = ethers.formatUnits(balance, decimals);
             if (parseFloat(balanceFormatted) > 0) {
-              const name = await contract.name().catch(() =>
-                contract.symbol().catch(() => tx.contractAddress.slice(0, 6))
-              );
-              tokens.push({
-                name,
-                balance: balanceFormatted
-              });
+              const name = await contract.name().catch(() => tx.tokenSymbol || tx.contractAddress.slice(0, 6));
+              tokens.push({ name, balance: balanceFormatted });
+              console.log(`[SUCCESS] Found token ${name} for ${address}: ${balanceFormatted}`);
             }
           } catch (error) {
-            console.log(`Error querying token ${tx.contractAddress} for ${address}:`, error.message);
+            console.log(`[ERROR] Querying token ${tx.contractAddress} for ${address}:`, error.message);
             continue;
           }
         }
       }
     } else {
-      console.log(`Polygonscan failed for ${address}:`, response.data.message);
+      console.log(`[ERROR] Explorer failed for ${address}:`, response.data.message);
     }
     return tokens;
   } catch (error) {
-    console.log(`Error fetching tokens from ${mappedNetwork} explorer for ${address}:`, error.message);
+    console.log(`[ERROR] Fetching tokens from ${mappedNetwork} explorer for ${address}:`, error.message);
     return [];
   }
 };
 
 // Health check
 app.get('/health', (req, res) => {
+  console.log('[INFO] Health check requested');
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Test endpoint
-app.get('/test', async (req, res) => {
+// Debug endpoint
+app.get('/debug', async (req, res) => {
+  const { address = '0xB78eB3BbD7F072009E20692af45c4B82a13e4033', network = 'poly' } = req.query;
+  console.log(`[INFO] Debug requested: address=${address}, network=${network}`);
   try {
-    const provider = await getProvider('poly');
+    const provider = await getProvider(network);
     const block = await provider.getBlockNumber();
-    res.status(200).json({ status: 'OK', network: 'poly', block });
+    const tokens = await getTokensFromExplorer(network, address);
+    res.status(200).json({ status: 'OK', network, block, tokens });
   } catch (error) {
-    console.log('Test endpoint error:', error.message);
+    console.log(`[ERROR] Debug failed:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/getBalance', async (req, res) => {
   const { address, network, contracts } = req.query;
-  console.log(`Request received: address=${address}, network=${network}, contracts=${contracts}`);
+  console.log(`[INFO] Balance requested: address=${address}, network=${network}, contracts=${contracts}`);
 
   try {
     if (!address || !network) {
+      console.log('[ERROR] Missing address or network');
       throw new Error('Missing address or network');
     }
 
@@ -275,20 +281,22 @@ app.get('/getBalance', async (req, res) => {
         try {
           solanaConnection = new Connection(url, 'confirmed');
           await solanaConnection.getBalance(new PublicKey(address));
+          console.log(`[SUCCESS] Connected to Solana RPC: ${url}`);
           break;
         } catch (error) {
-          console.log(`Failed Solana RPC ${url}:`, error.message);
+          console.log(`[ERROR] Failed Solana RPC ${url}:`, error.message);
           continue;
         }
       }
       if (!solanaConnection) throw new Error('No available Solana RPC');
 
       const publicKey = new PublicKey(address);
-      const nativeBalance = await solanaConnection gimnasio.getBalance(publicKey);
+      const nativeBalance = await solanaConnection.getBalance(publicKey);
       const tokens = [];
 
       if (contracts) {
         const contractList = contracts.split(',');
+        console.log(`[INFO] Processing Solana contracts: ${contractList}`);
         const tokenAccounts = await solanaConnection.getTokenAccountsByOwner(publicKey, {
           programId: new PublicKey('TokenkegQfeZyiNwAJbNbGK7N6')
         });
@@ -299,14 +307,14 @@ app.get('/getBalance', async (req, res) => {
               name: 'Token',
               balance: info.tokenAmount.uiAmount
             });
+            console.log(`[SUCCESS] Found Solana token for ${address}: ${info.tokenAmount.uiAmount}`);
           }
         }
       }
 
-      return res.json({
-        native: nativeBalance / 1e9,
-        tokens
-      });
+      const result = { native: nativeBalance / 1e9, tokens };
+      console.log(`[SUCCESS] Balance for ${address} on sol:`, JSON.stringify(result));
+      return res.json(result);
     }
 
     const provider = await getProvider(network);
@@ -327,13 +335,11 @@ app.get('/getBalance', async (req, res) => {
           const decimals = await contract.decimals();
           const balanceFormatted = ethers.formatUnits(balance, decimals);
           if (parseFloat(balanceFormatted) > 0) {
-            tokens.push({
-              name: token.name,
-              balance: balanceFormatted
-            });
+            tokens.push({ name: token.name, balance: balanceFormatted });
+            console.log(`[SUCCESS] Found popular token ${token.name} for ${address}: ${balanceFormatted}`);
           }
         } catch (error) {
-          console.log(`Error querying popular token ${token.name} at ${token.address}:`, error.message);
+          console.log(`[ERROR] Querying popular token ${token.name} at ${token.address}:`, error.message);
           continue;
         }
       }
@@ -342,7 +348,7 @@ app.get('/getBalance', async (req, res) => {
     // Check custom contracts
     if (contracts) {
       const contractList = contracts.split(',');
-      console.log(`Processing custom contracts: ${contractList}`);
+      console.log(`[INFO] Processing custom contracts: ${contractList}`);
       for (const contractAddress of contractList) {
         try {
           const contract = new ethers.Contract(contractAddress, tokenAbi, provider);
@@ -350,31 +356,26 @@ app.get('/getBalance', async (req, res) => {
           const decimals = await contract.decimals();
           const balanceFormatted = ethers.formatUnits(balance, decimals);
           if (parseFloat(balanceFormatted) > 0) {
-            const name = await contract.name().catch(() =>
-              contract.symbol().catch(() => contractAddress.slice(0, 6))
-            );
+            const name = await contract.name().catch(() => contractAddress.slice(0, 6));
             if (!tokens.some((t) => t.name === name)) {
-              tokens.push({
-                name,
-                balance: balanceFormatted
-              });
+              tokens.push({ name, balance: balanceFormatted });
+              console.log(`[SUCCESS] Found custom token ${name} for ${address}: ${balanceFormatted}`);
             }
           }
         } catch (error) {
-          console.log(`Error querying custom contract ${contractAddress}:`, error.message);
+          console.log(`[ERROR] Querying custom contract ${contractAddress}:`, error.message);
           continue;
         }
       }
     }
 
-    res.json({
-      native: ethers.formatEther(nativeBalance),
-      tokens
-    });
+    const result = { native: ethers.formatEther(nativeBalance), tokens };
+    console.log(`[SUCCESS] Balance for ${address} on ${network}:`, JSON.stringify(result));
+    res.json(result);
   } catch (error) {
-    console.log(`Error in getBalance for address=${address}, network=${network}:`, error.message);
+    console.log(`[ERROR] getBalance failed for address=${address}, network=${network}:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(process.env.PORT || 3001, () => console.log('Server jalan'));
+app.listen(process.env.PORT || 3001, () => console.log('[INFO] Server jalan'));
