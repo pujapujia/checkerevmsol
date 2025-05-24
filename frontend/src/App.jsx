@@ -5,7 +5,7 @@ function ErrorBoundary({ children }) {
   const [hasError, setHasError] = useState(false);
   useEffect(() => {
     const errorHandler = (error) => {
-      console.error(error);
+      console.error('[ERROR] Global error:', error);
       setHasError(true);
     };
     window.addEventListener('error', errorHandler);
@@ -42,7 +42,7 @@ function App() {
     const saved = JSON.parse(localStorage.getItem('wallets') || '[]');
     const wallets = saved.map((addr, i) => ({ address: addr, name: `Wallet ${i + 1}` }));
     setSavedWallets(wallets);
-    console.log('Loaded wallets from localStorage:', wallets);
+    console.log('[INFO] Loaded wallets from localStorage:', wallets);
   }, []);
 
   const handleChainChange = (chain) => {
@@ -61,7 +61,7 @@ function App() {
     const updatedWallets = [...savedWallets, ...newWallets];
     setSavedWallets(updatedWallets);
     localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
-    console.log('Saved wallets to localStorage:', updatedWallets);
+    console.log('[INFO] Saved wallets to localStorage:', updatedWallets);
     setWalletInput('');
   };
 
@@ -71,7 +71,7 @@ function App() {
       .map((w, i) => ({ ...w, name: `Wallet ${i + 1}` }));
     setSavedWallets(updatedWallets);
     localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
-    console.log('Deleted wallet:', address, 'New wallets:', updatedWallets);
+    console.log('[INFO] Deleted wallet:', address, 'New wallets:', updatedWallets);
     if (selectedWallet?.toLowerCase() === address.toLowerCase()) {
       setSelectedWallet(null);
       setBalances([]);
@@ -79,17 +79,21 @@ function App() {
   };
 
   const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
-    console.log('Fetching:', url);
+    console.log('[INFO] Fetching:', url);
     for (let i = 0; i < retries; i++) {
       try {
         const res = await fetch(url, {
           mode: 'cors',
-          signal: AbortSignal.timeout(15000)
+          signal: AbortSignal.timeout(20000)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        if (!res.ok) {
+          const text = await res.text().catch(() => 'No response text');
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        console.log('[SUCCESS] Fetch successful:', url);
         return await res.json();
       } catch (error) {
-        console.log(`Fetch attempt ${i + 1} failed:`, error.message);
+        console.log(`[ERROR] Fetch attempt ${i + 1} failed:`, error.message);
         if (i < retries - 1) {
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
@@ -120,10 +124,12 @@ function App() {
         if (data.error) throw new Error(data.error);
         const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || `Wallet ${walletAddr.slice(0, 6)}`;
         results.push({ wallet: walletAddr, walletName, chain, ...data });
+        console.log('[SUCCESS] Balance fetched for', walletAddr, chain);
       } catch (error) {
         const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || `Wallet ${walletAddr.slice(0, 6)}`;
         results.push({ wallet: walletAddr, walletName, chain, error: error.message });
         setError(`Gagal fetch data untuk ${chain}: ${error.message}`);
+        console.log('[ERROR] Balance fetch failed for', walletAddr, chain, ':', error.message);
       }
     }
 
@@ -134,7 +140,6 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-900 text-white font-mono flex">
-        {/* Sidebar */}
         <div className="w-64 bg-gray-800 p-4 h-screen overflow-y-auto">
           <h2 className="text-lg font-semibold mb-4">Wallet Tersimpan</h2>
           <textarea
@@ -175,7 +180,6 @@ function App() {
             ))
           )}
         </div>
-        {/* Main Content */}
         <div className="flex-1 p-6">
           <h1 className="text-2xl font-bold mb-6 text-center">Balance Checker</h1>
           <div className="grid grid-cols-4 gap-4 mb-6">
