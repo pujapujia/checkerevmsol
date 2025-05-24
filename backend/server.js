@@ -5,7 +5,7 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors({ origin: 'https://checkerevmsol-e8j2.vercel.app' })); // Spesifik buat frontend
+app.use(cors({ origin: '*' })); // Wildcard buat debug, ganti ke spesifik kalau stabil
 app.use(express.json());
 
 const networkMap = {
@@ -27,53 +27,42 @@ const rpcUrls = {
   bsc: [
     'https://bsc-dataseed1.binance.org/',
     'https://rpc.ankr.com/bsc',
-    'https://bsc.publicnode.com',
-    'https://bsc-dataseed2.binance.org/',
-    'https://bsc-dataseed3.binance.org/',
-    'https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a91b1d0de0f'
+    'https://bsc.publicnode.com'
   ],
   avax: [
     'https://api.avax.network/ext/bc/C/rpc',
     'https://rpc.ankr.com/avalanche',
-    'https://avalanche.public-rpc.com',
-    'https://avalanche-c-chain.publicnode.com',
-    'https://rpc.ankr.com/avalanche-c',
-    'https://ava-mainnet.public.blastapi.io/ext/bc/C/rpc'
+    'https://avalanche.public-rpc.com'
   ],
   matic: [
     'https://rpc-mainnet.maticvigil.com',
     'https://rpc.ankr.com/polygon',
     'https://polygon-rpc.com',
-    'https://polygon-mainnet.g.alchemy.com/v2/demo',
-    'https://rpc-mainnet.matic.quiknode.pro',
-    'https://matic-mainnet.chainstacklabs.com',
     'https://poly-mainnet.rpc.grove.city/v1/803a2461',
-    'https://polygon-mainnet.public.blastapi.io'
+    'https://polygon-mainnet.public.blastapi.io',
+    'https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY', // Ganti kalau punya
+    'https://polygon-mainnet.g.alchemy.com/v2/demo',
+    'https://matic-mainnet.chainstacklabs.com'
   ],
   base: [
     'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
-    'https://base.publicnode.com',
-    'https://base-mainnet.g.alchemy.com/v2/demo',
-    'https://rpc.ankr.com/base-mainnet'
+    'https://base.publicnode.com'
   ],
   eth: [
     'https://rpc.ankr.com/eth',
     'https://ethereum.publicnode.com',
-    'https://eth.llamarpc.com',
-    'https://eth-mainnet.g.alchemy.com/v2/demo'
+    'https://eth.llamarpc.com'
   ],
   optimism: [
     'https://mainnet.optimism.io',
     'https://rpc.ankr.com/optimism',
-    'https://optimism.publicnode.com',
-    'https://optimism-mainnet.g.alchemy.com/v2/demo'
+    'https://optimism.publicnode.com'
   ],
   arbitrum: [
     'https://arb1.arbitrum.io/rpc',
     'https://rpc.ankr.com/arbitrum',
-    'https://arbitrum.publicnode.com',
-    'https://arbitrum-mainnet.g.alchemy.com/v2/demo'
+    'https://arbitrum.publicnode.com'
   ],
   sepolia: [
     'https://rpc.sepolia.org',
@@ -81,24 +70,19 @@ const rpcUrls = {
   ],
   bsc_testnet: [
     'https://data-seed-prebsc-1-s1.binance.org:8545/',
-    'https://rpc.ankr.com/bsc_testnet',
-    'https://bsc-testnet.publicnode.com'
+    'https://rpc.ankr.com/bsc_testnet'
   ],
   mumbai: [
     'https://rpc-mumbai.matic.today',
-    'https://rpc.ankr.com/polygon_mumbai',
-    'https://mumbai.polygonscan.com'
+    'https://rpc.ankr.com/polygon_mumbai'
   ],
   fuji: [
     'https://api.avax-test.network/ext/bc/C/rpc',
-    'https://rpc.ankr.com/avalanche_fuji',
-    'https://avalanche-fuji-c-chain.publicnode.com'
+    'https://rpc.ankr.com/avalanche_fuji'
   ],
   sol: [
     'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana',
-    'https://solana-mainnet.g.alchemy.com/v2/demo',
-    'https://solana-mainnet.rpc.extrnode.com'
+    'https://rpc.ankr.com/solana'
   ]
 };
 
@@ -117,37 +101,17 @@ const explorers = {
 };
 
 const apiKeys = {
-  bsc: [
-    '5DKFJ6AWWNQU7H766PGCCKPTXS32EYHE8M',
-    'GEJUTZUV2C459NTIA3Y3WRFVJXY3D4C2AH',
-    '8NDC7ERUFFHRTXEVRSXKCNKHN58XHFURV8'
-  ],
+  bsc: ['5DKFJ6AWWNQU7H766PGCCKPTXS32EYHE8M'],
   avax: ['YOUR_SNOWTRACE_API_KEY_1'],
   matic: [
     'KQ43QA1YT3A6F2DPXHAY899SQVVXS8PX1K',
     'EB22YZFWMJVNC6EF19E8TH3U6H5DJXPWW6',
     'AHBV45FUNR5J7VSTZG19ZX17HFN2NMB38H'
   ],
-  base: [
-    'FGRE5HU4K36ZQMFPX84W35YH1K7UJC4R62',
-    '8WI3VT5TNSSZXMIZYVMV58JR4RNH3CT4EF',
-    'NKDY3JVWJQNFJ1YVQC2Y98IWUAY5MZAQWS'
-  ],
-  eth: [
-    'IHINXYAP9Y5RI529JZD8DDN78GPZVVMIK8',
-    'WR938Y1T2ZQRECGU7Z6RE4QS2KYWTFCWZI',
-    'MC9J5KA65J3KPVZTFMHYGS1G2NZ51KNWSV'
-  ],
-  optimism: [
-    '3CBBEGR1XXWSHMI97NZWDUBCZX87EMUBH9',
-    'QZEQXKC6SK4UM61KC7DC6YAR9X5KVVJ3PY',
-    'Z22XIPRPN29JETAQ3V9KKRPPGZFS9W116N'
-  ],
-  arbitrum: [
-    'GAER9RIXRQKB91U8JBMW6Z1WK7Z7EN6DMF',
-    'R62Z8DZRW82GU8SFD3WRCP1ZYFC768A64M',
-    'VPW6J45IRU7RQXYGYNUIR3632T2SJMXVC8'
-  ],
+  base: ['FGRE5HU4K36ZQMFPX84W35YH1K7UJC4R62'],
+  eth: ['IHINXYAP9Y5RI529JZD8DDN78GPZVVMIK8'],
+  optimism: ['3CBBEGR1XXWSHMI97NZWDUBCZX87EMUBH9'],
+  arbitrum: ['GAER9RIXRQKB91U8JBMW6Z1WK7Z7EN6DMF'],
   sepolia: ['IHINXYAP9Y5RI529JZD8DDN78GPZVVMIK8'],
   bsc_testnet: ['5DKFJ6AWWNQU7H766PGCCKPTXS32EYHE8M'],
   mumbai: ['KQ43QA1YT3A6F2DPXHAY899SQVVXS8PX1K'],
@@ -164,7 +128,6 @@ const tokenAbi = [
 const popularTokens = {
   eth: [
     { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', name: 'USDT' },
-    { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', name: 'DAI' },
     { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', name: 'USDC' }
   ],
   avax: [
@@ -178,7 +141,8 @@ const popularTokens = {
   ],
   matic: [
     { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', name: 'USDT' },
-    { address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', name: 'USDC' }
+    { address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', name: 'USDC' },
+    { address: '0xf19C89D844745B9910882A64b65aa4cb44DF492d', name: 'FAN' }
   ],
   arbitrum: [
     { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', name: 'USDT' }
@@ -194,7 +158,7 @@ const getProvider = async (network, retries = 3) => {
         const provider = new ethers.JsonRpcProvider(url);
         await Promise.race([
           provider.getBlockNumber(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('RPC timeout')), 7000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`RPC timeout: ${url}`)), 5000))
         ]);
         console.log(`Connected to RPC: ${url} (attempt ${attempt})`);
         return provider;
@@ -221,7 +185,10 @@ const getTokensFromExplorer = async (network, address) => {
   const mappedNetwork = networkMap[network] || network;
   const explorerUrl = explorers[mappedNetwork];
   const apiKey = getApiKey(network);
-  if (!explorerUrl || !apiKey) return [];
+  if (!explorerUrl || !apiKey) {
+    console.log(`No explorer or API key for ${mappedNetwork}`);
+    return [];
+  }
 
   try {
     const provider = await getProvider(network);
@@ -232,12 +199,14 @@ const getTokensFromExplorer = async (network, address) => {
         action: 'tokentx',
         address,
         page: 1,
-        offset: 100,
+        offset: 50, // Batasi buat cegah timeout
         sort: 'desc',
         apikey: apiKey
       },
-      timeout: 15000
+      timeout: 10000
     });
+
+    console.log(`Polygonscan response for ${address} on ${mappedNetwork}:`, response.data.status);
 
     if (response.data.status === '1' && response.data.result) {
       const tokenContracts = new Set();
@@ -259,22 +228,36 @@ const getTokensFromExplorer = async (network, address) => {
               });
             }
           } catch (error) {
-            console.log(`Error querying explorer token ${tx.contractAddress}:`, error.message);
+            console.log(`Error querying token ${tx.contractAddress} for ${address}:`, error.message);
             continue;
           }
         }
       }
+    } else {
+      console.log(`Polygonscan failed for ${address}:`, response.data.message);
     }
     return tokens;
   } catch (error) {
-    console.log(`Error fetching tokens from ${mappedNetwork} explorer:`, error.message);
+    console.log(`Error fetching tokens from ${mappedNetwork} explorer for ${address}:`, error.message);
     return [];
   }
 };
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint
+app.get('/test', async (req, res) => {
+  try {
+    const provider = await getProvider('poly');
+    const block = await provider.getBlockNumber();
+    res.status(200).json({ status: 'OK', network: 'poly', block });
+  } catch (error) {
+    console.log('Test endpoint error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get('/getBalance', async (req, res) => {
@@ -293,14 +276,15 @@ app.get('/getBalance', async (req, res) => {
           solanaConnection = new Connection(url, 'confirmed');
           await solanaConnection.getBalance(new PublicKey(address));
           break;
-        } catch {
+        } catch (error) {
+          console.log(`Failed Solana RPC ${url}:`, error.message);
           continue;
         }
       }
       if (!solanaConnection) throw new Error('No available Solana RPC');
 
       const publicKey = new PublicKey(address);
-      const nativeBalance = await solanaConnection.getBalance(publicKey);
+      const nativeBalance = await solanaConnection gimnasio.getBalance(publicKey);
       const tokens = [];
 
       if (contracts) {
@@ -332,7 +316,7 @@ app.get('/getBalance', async (req, res) => {
     // Get tokens from explorer
     tokens = await getTokensFromExplorer(network, address);
 
-    // Check popular tokens (fallback)
+    // Check popular tokens
     const mappedNetwork = networkMap[network] || network;
     const chainTokens = popularTokens[mappedNetwork] || [];
     for (const token of chainTokens) {
@@ -388,7 +372,7 @@ app.get('/getBalance', async (req, res) => {
       tokens
     });
   } catch (error) {
-    console.log('Error in getBalance:', error.message);
+    console.log(`Error in getBalance for address=${address}, network=${network}:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });
