@@ -44,7 +44,7 @@ function App() {
     for (const wallet of walletList) {
       for (const chain of selectedChains) {
         try {
-          const res = await fetch(`https://checkerevmsol-backend.vercel.app/getBalance?address=${wallet}&network=${chain}`);
+          const res = await fetch(`https://checkerevmsol.vercel.app/getBalance?address=${wallet}&network=${chain}`);
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           results.push({ wallet, chain, ...data });
