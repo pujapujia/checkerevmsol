@@ -47,7 +47,9 @@ const rpcUrls = {
 
 const tokenAbi = [
   'function balanceOf(address) view returns (uint256)',
-  'function decimals() view returns (uint8)'
+  'function decimals() view returns (uint8)',
+  'function name() view returns (string)',
+  'function symbol() view returns (string)'
 ];
 
 const popularTokens = {
@@ -150,7 +152,7 @@ app.get('/getBalance', async (req, res) => {
           });
         }
       } catch (error) {
-        console.log(`Error querying popular token ${token.name}:`, error.message);
+        console.log(`Error querying popular token ${token.name} at ${token.address}:`, error.message);
         continue;
       }
     }
@@ -158,14 +160,17 @@ app.get('/getBalance', async (req, res) => {
     // Check custom contracts
     if (contracts) {
       const contractList = contracts.split(',');
+      console.log(`Processing custom contracts: ${contractList}`);
       for (const contractAddress of contractList) {
         try {
           const contract = new ethers.Contract(contractAddress, tokenAbi, provider);
           const balance = await contract.balanceOf(address);
           const decimals = await contract.decimals();
-          const name = await contract.name().catch(() => contract.symbol().catch(() => contractAddress.slice(0, 6)));
           const balanceFormatted = ethers.formatUnits(balance, decimals);
           if (parseFloat(balanceFormatted) > 0) {
+            const name = await contract.name().catch(() =>
+              contract.symbol().catch(() => contractAddress.slice(0, 6))
+            );
             tokens.push({
               name,
               balance: balanceFormatted
