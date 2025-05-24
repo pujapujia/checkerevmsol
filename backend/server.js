@@ -65,30 +65,8 @@ const getProvider = async (network) => {
   throw new Error(`No available RPC for ${network}`);
 };
 
-const popularTokens = {
-  eth: [
-    { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', name: 'USDT' },
-    { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', name: 'DAI' }
-  ],
-  avax: [
-    { address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', name: 'USDC' }
-  ],
-  bnb: [
-    { address: '0x55d398326f99059fF775485246999027B3197955', name: 'USDT' }
-  ],
-  base: [
-    { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', name: 'USDC' }
-  ],
-  poly: [
-    { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', name: 'USDT' }
-  ],
-  arb: [
-    { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', name: 'USDT' }
-  ]
-};
-
 app.get('/getBalance', async (req, res) => {
-  const { address, network } = req.query;
+  const { address, network, contracts } = req.query;
 
   try {
     if (network === 'sol') {
@@ -106,13 +84,23 @@ app.get('/getBalance', async (req, res) => {
 
       const publicKey = new PublicKey(address);
       const nativeBalance = await solanaConnection.getBalance(publicKey);
-      const tokenAccounts = await solanaConnection.getTokenAccountsByOwner(publicKey, {
-        programId: new PublicKey('TokenkegQfeZyiNwAJbNbGK7N6')
-      });
-      const tokens = tokenAccounts.value.map(acc => ({
-        name: 'Token',
-        balance: acc.account.data.parsed.info.tokenAmount.uiAmount
-      }));
+      const tokens = [];
+      
+      if (contracts) {
+        const contractList = contracts.split(',');
+        const tokenAccounts = await solanaConnection.getTokenAccountsByOwner(publicKey, {
+          programId: new PublicKey('TokenkegQfeZyiNwAJbNbGK7N6')
+        });
+        for (const acc of tokenAccounts.value) {
+          const info = acc.account.data.parsed.info;
+          if (contractList.includes(info.mint)) {
+            tokens.push({
+              name: 'Token',
+              balance: info.tokenAmount.uiAmount
+            });
+          }
+        }
+      }
 
       return res.json({
         native: nativeBalance / 1e9,
@@ -124,18 +112,22 @@ app.get('/getBalance', async (req, res) => {
     const nativeBalance = await provider.getBalance(address);
     const tokens = [];
 
-    for (const token of popularTokens[network] || []) {
-      try {
-        const contract = new ethers.Contract(token.address, tokenAbi, provider);
-        const balance = await contract.balanceOf(address);
-        const decimals = await contract.decimals();
-        const name = token.name || (await contract.name());
-        tokens.push({
-          name,
-          balance: ethers.formatUnits(balance, decimals)
-        });
-      } catch {
-        continue;
+    if (contracts) {
+      const contractList = contracts.split(',');
+      for (const contractAddress of contractList) {
+        try {
+          const contract = new ethers.Contract(contractAddress, tokenAbi, provider);
+          const balance = await contract.balanceOf(address);
+          const decimals = await contract.decimals();
+          const name = await contract.name().catch(() => 'Unknown');
+          const symbol = await contract.symbol().catch(() => 'Unknown');
+          tokens.push({
+            name: name || symbol || 'Unknown',
+            balance: ethers.formatUnits(balance, decimals)
+          });
+        } catch {
+          continue;
+        }
       }
     }
 
