@@ -78,20 +78,23 @@ function App() {
     }
   };
 
-  const fetchWithRetry = async (url, retries = 5, delay = 2000) => {
+  const fetchWithRetry = async (url, retries = 7, delay = 3000) => {
     console.log('[INFO] Fetching:', url);
     for (let i = 0; i < retries; i++) {
       try {
+        const start = Date.now();
         const res = await fetch(url, {
           mode: 'cors',
-          signal: AbortSignal.timeout(30000),
-          headers: { 'Accept': 'application/json' }
+          signal: AbortSignal.timeout(40000),
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
         });
+        const duration = Date.now() - start;
         const responseText = await res.text().catch(() => 'No response text');
+        console.log(`[INFO] Fetch attempt ${i + 1}: Status=${res.status}, Duration=${duration}ms, Response:`, responseText);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${responseText}`);
         }
-        console.log('[SUCCESS] Fetch successful:', url, 'Response:', responseText);
+        console.log('[SUCCESS] Fetch successful:', url);
         return JSON.parse(responseText);
       } catch (error) {
         console.log(`[ERROR] Fetch attempt ${i + 1} failed:`, error.message);
@@ -112,6 +115,11 @@ function App() {
     const selectedChains = Object.keys(chains).filter((c) => chains[c]);
     if (selectedChains.length === 0) {
       setError('Pilih minimal satu jaringan!');
+      setLoading(false);
+      return;
+    }
+    if (!walletAddr || !/^0x[a-fA-F0-9]{40}$/.test(walletAddr)) {
+      setError('Alamat wallet invalid!');
       setLoading(false);
       return;
     }
