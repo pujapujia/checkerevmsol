@@ -78,23 +78,25 @@ function App() {
     }
   };
 
-  const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+  const fetchWithRetry = async (url, retries = 5, delay = 2000) => {
     console.log('[INFO] Fetching:', url);
     for (let i = 0; i < retries; i++) {
       try {
         const res = await fetch(url, {
           mode: 'cors',
-          signal: AbortSignal.timeout(20000)
+          signal: AbortSignal.timeout(30000),
+          headers: { 'Accept': 'application/json' }
         });
+        const responseText = await res.text().catch(() => 'No response text');
         if (!res.ok) {
-          const text = await res.text().catch(() => 'No response text');
-          throw new Error(`HTTP ${res.status}: ${text}`);
+          throw new Error(`HTTP ${res.status}: ${responseText}`);
         }
-        console.log('[SUCCESS] Fetch successful:', url);
-        return await res.json();
+        console.log('[SUCCESS] Fetch successful:', url, 'Response:', responseText);
+        return JSON.parse(responseText);
       } catch (error) {
         console.log(`[ERROR] Fetch attempt ${i + 1} failed:`, error.message);
         if (i < retries - 1) {
+          console.log(`[INFO] Retrying after ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
