@@ -160,11 +160,10 @@ app.get('/getBalance', async (req, res) => {
       const contractList = contracts.split(',');
       for (const contractAddress of contractList) {
         try {
-          const name = await contract.name().catch(() => contract.symbol().catch(() => contractAddress.slice(0, 6)));
           const contract = new ethers.Contract(contractAddress, tokenAbi, provider);
           const balance = await contract.balanceOf(address);
           const decimals = await contract.decimals();
-          const name = await contract.name().catch(() => contract.symbol().catch(() => 'Unknown'));
+          const name = await contract.name().catch(() => contract.symbol().catch(() => contractAddress.slice(0, 6)));
           const balanceFormatted = ethers.formatUnits(balance, decimals);
           if (parseFloat(balanceFormatted) > 0) {
             tokens.push({
