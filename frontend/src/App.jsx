@@ -101,7 +101,7 @@ function App() {
         <textarea
           className="w-full p-2 font-mono bg-gray-100 border rounded mb-4"
           rows="3"
-          placeholder="Paste contract address(es) here, one per line (optional)"
+          placeholder="Paste contract address(es) for custom tokens, one per line (optional)"
           value={contractInput}
           onChange={(e) => setContractInput(e.target.value)}
         />
@@ -122,13 +122,16 @@ function App() {
                 <p><strong>Error:</strong> {b.error}</p>
               ) : (
                 <>
-                  <p><strong>Saldo Native:</strong> {b.native}</p>
+                  <p><strong>Saldo Native:</strong> {b.native} {b.chain === 'sol' ? 'SOL' : b.chain === 'poly' ? 'MATIC' : b.chain.toUpperCase()}</p>
                   <p><strong>Token:</strong></p>
                   <ul>
-                    {b.tokens.map((t, j) => (
-                      <li key={j}>- {t.name}: {t.balance}</li>
-                    ))}
-                    {b.tokens.length === 0 && <li>No tokens detected</li>}
+                    {b.tokens.length > 0 ? (
+                      b.tokens.map((t, j) => (
+                        <li key={j}>- {t.name}: {t.balance}</li>
+                      ))
+                    ) : (
+                      <li>No tokens detected</li>
+                    )}
                   </ul>
                 </>
               )}
