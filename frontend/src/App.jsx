@@ -51,7 +51,7 @@ function App() {
     const walletList = walletInput
       .split('\n')
       .map((w) => w.trim())
-      .filter((w) => w && !savedWallets.some((sw) => sw.address === w));
+      .filter((w) => w && !savedWallets.some((sw) => sw.address.toLowerCase() === w.toLowerCase()));
     const newWallets = walletList.map((addr, i) => ({
       address: addr,
       name: `Wallet ${savedWallets.length + i + 1}`
@@ -64,13 +64,30 @@ function App() {
 
   const deleteWallet = (address) => {
     const updatedWallets = savedWallets
-      .filter((w) => w.address !== address)
+      .filter((w) => w.address.toLowerCase() !== address.toLowerCase())
       .map((w, i) => ({ ...w, name: `Wallet ${i + 1}` }));
     setSavedWallets(updatedWallets);
     localStorage.setItem('wallets', JSON.stringify(updatedWallets.map((w) => w.address)));
-    if (selectedWallet === address) {
+    if (selectedWallet?.toLowerCase() === address.toLowerCase()) {
       setSelectedWallet(null);
       setBalances([]);
+    }
+  };
+
+  const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await fetch(url, { mode: 'cors' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } catch (error) {
+        console.log(`Fetch attempt ${i + 1} failed:`, error.message);
+        if (i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
     }
   };
 
@@ -90,15 +107,14 @@ function App() {
     for (const chain of selectedChains) {
       try {
         const contractsParam = contractList.length > 0 ? `&contracts=${contractList.join(',')}` : '';
-        const res = await fetch(`https://checkerevmsol-backend.vercel.app/getBalance?address=${walletAddr}&network=${chain}${contractsParam}`, {
-          mode: 'cors'
-        });
-        const data = await res.json();
+        const url = `https://checkerevmsol-backend.vercel.app/getBalance?address=${walletAddr}&network=${chain}${contractsParam}`;
+        const data = await fetchWithRetry(url);
         if (data.error) throw new Error(data.error);
-        const walletName = savedWallets.find((w) => w.address === walletAddr)?.name || 'Unknown';
+        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || walletAddr.slice(0, 6);
         results.push({ wallet: walletAddr, walletName, chain, ...data });
       } catch (error) {
-        results.push({ wallet: walletAddr, walletName: 'Unknown', chain, error: error.message });
+        const walletName = savedWallets.find((w) => w.address.toLowerCase() === walletAddr.toLowerCase())?.name || walletAddr.slice(0, 6);
+        results.push({ wallet: walletAddr, walletName, chain, error: error.message });
         setError(`Gagal fetch data untuk ${chain}: ${error.message}`);
       }
     }
@@ -135,7 +151,7 @@ function App() {
                 className="flex items-center justify-between p-2 mb-2 rounded-lg cursor-pointer transition duration-200 hover:bg-gray-700"
               >
                 <div
-                  className={`flex-1 ${selectedWallet === wallet.address ? 'bg-gray-600' : ''}`}
+                  className={`flex-1 ${selectedWallet?.toLowerCase() === wallet.address.toLowerCase() ? 'bg-gray-600' : ''}`}
                   onClick={() => checkBalance(wallet.address)}
                 >
                   <p className="text-gray-300 break-all">{wallet.name}</p>
