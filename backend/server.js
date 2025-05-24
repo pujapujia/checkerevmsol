@@ -5,8 +5,21 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors({ origin: '*' })); // Wildcard buat debug
+app.use(cors({
+  origin: '*', // Wildcard buat debug
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
+
+// Middleware log headers
+app.use((req, res, next) => {
+  console.log(`[INFO] Request: ${req.method} ${req.url}, Headers:`, req.headers);
+  res.on('finish', () => {
+    console.log(`[INFO] Response: ${req.method} ${req.url}, Status: ${res.statusCode}`);
+  });
+  next();
+});
 
 const networkMap = {
   poly: 'matic',
@@ -28,13 +41,15 @@ const rpcUrls = {
     'https://bsc-dataseed1.binance.org/',
     'https://rpc.ankr.com/bsc',
     'https://bsc.publicnode.com',
-    'https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a91b1d0de0f'
+    'https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a91b1d0de0f',
+    'https://bsc-dataseed2.binance.org/'
   ],
   avax: [
     'https://api.avax.network/ext/bc/C/rpc',
     'https://rpc.ankr.com/avalanche',
     'https://avalanche.public-rpc.com',
-    'https://avalanche-c-chain.publicnode.com'
+    'https://avalanche-c-chain.publicnode.com',
+    'https://avax-mainnet.public.blastapi.io/ext/bc/C/rpc'
   ],
   matic: [
     'https://rpc-mainnet.maticvigil.com',
@@ -43,32 +58,38 @@ const rpcUrls = {
     'https://poly-mainnet.rpc.grove.city/v1/803a2461',
     'https://polygon-mainnet.public.blastapi.io',
     'https://matic-mainnet.chainstacklabs.com',
-    'https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
+    'https://polygon-mainnet.g.alchemy.com/v2/demo',
+    'https://polygon-mainnet.quicknode.com/YOUR_KEY' // Ganti kalau punya
   ],
   base: [
     'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
-    'https://base.publicnode.com'
+    'https://base.publicnode.com',
+    'https://base-mainnet.g.alchemy.com/v2/demo'
   ],
   eth: [
     'https://rpc.ankr.com/eth',
     'https://ethereum.publicnode.com',
     'https://eth.llamarpc.com',
-    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
+    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY', // Ganti kalau punya
+    'https://eth-mainnet.g.alchemy.com/v2/demo'
   ],
   optimism: [
     'https://mainnet.optimism.io',
     'https://rpc.ankr.com/optimism',
-    'https://optimism.publicnode.com'
+    'https://optimism.publicnode.com',
+    'https://optimism-mainnet.public.blastapi.io'
   ],
   arbitrum: [
     'https://arb1.arbitrum.io/rpc',
     'https://rpc.ankr.com/arbitrum',
-    'https://arbitrum.publicnode.com'
+    'https://arbitrum.publicnode.com',
+    'https://arbitrum-mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
   ],
   sepolia: [
     'https://rpc.sepolia.org',
-    'https://rpc.ankr.com/eth_sepolia'
+    'https://rpc.ankr.com/eth_sepolia',
+    'https://sepolia.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
   ],
   bsc_testnet: [
     'https://data-seed-prebsc-1-s1.binance.org:8545/',
@@ -76,7 +97,8 @@ const rpcUrls = {
   ],
   mumbai: [
     'https://rpc-mumbai.matic.today',
-    'https://rpc.ankr.com/polygon_mumbai'
+    'https://rpc.ankr.com/polygon_mumbai',
+    'https://mumbai.polygonscan.com/api'
   ],
   fuji: [
     'https://api.avax-test.network/ext/bc/C/rpc',
@@ -85,7 +107,8 @@ const rpcUrls = {
   sol: [
     'https://api.mainnet-beta.solana.com',
     'https://rpc.ankr.com/solana',
-    'https://solana-mainnet.rpc.extrnode.com'
+    'https://solana-mainnet.rpc.extrnode.com',
+    'https://solana-mainnet.g.alchemy.com/v2/demo'
   ]
 };
 
@@ -250,6 +273,20 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint (cek chain tanpa address)
+app.get('/test', async (req, res) => {
+  const { network = 'poly' } = req.query;
+  console.log(`[INFO] Test requested: network=${network}`);
+  try {
+    const provider = await getProvider(network);
+    const block = await provider.getBlockNumber();
+    res.status(200).json({ status: 'OK', network, block });
+  } catch (error) {
+    console.log(`[ERROR] Test failed for ${network}:`, error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint
 app.get('/debug', async (req, res) => {
   const { address = '0xB78eB3BbD7F072009E20692af45c4B82a13e4033', network = 'poly' } = req.query;
@@ -275,6 +312,8 @@ app.get('/getBalance', async (req, res) => {
       throw new Error('Missing address or network');
     }
 
+    let nativeBalance, tokens = [];
+
     if (network === 'sol') {
       let solanaConnection;
       for (const url of rpcUrls.sol) {
@@ -291,8 +330,7 @@ app.get('/getBalance', async (req, res) => {
       if (!solanaConnection) throw new Error('No available Solana RPC');
 
       const publicKey = new PublicKey(address);
-      const nativeBalance = await solanaConnection.getBalance(publicKey);
-      const tokens = [];
+      nativeBalance = await solanaConnection.getBalance(publicKey);
 
       if (contracts) {
         const contractList = contracts.split(',');
@@ -318,11 +356,14 @@ app.get('/getBalance', async (req, res) => {
     }
 
     const provider = await getProvider(network);
-    const nativeBalance = await provider.getBalance(address);
-    let tokens = [];
+    nativeBalance = await provider.getBalance(address);
 
-    // Get tokens from explorer
-    tokens = await getTokensFromExplorer(network, address);
+    // Get tokens from explorer (fallback to popular tokens if fails)
+    try {
+      tokens = await getTokensFromExplorer(network, address);
+    } catch (error) {
+      console.log(`[WARN] Explorer failed, using popular tokens only for ${network}`);
+    }
 
     // Check popular tokens
     const mappedNetwork = networkMap[network] || network;
@@ -373,7 +414,7 @@ app.get('/getBalance', async (req, res) => {
     console.log(`[SUCCESS] Balance for ${address} on ${network}:`, JSON.stringify(result));
     res.json(result);
   } catch (error) {
-    console.log(`[ERROR] getBalance failed for address=${address}, network=${network}:`, error.message);
+    console.log(`[ERROR] getBalance failed for address=${address}, network=${network}:`, error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 });
