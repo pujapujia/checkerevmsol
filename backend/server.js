@@ -5,7 +5,7 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors({ origin: '*' })); // Izinkan semua origin, ganti ke spesifik kalau live
+app.use(cors({ origin: 'https://checkerevmsol-e8j2.vercel.app' })); // Spesifik buat frontend
 app.use(express.json());
 
 const networkMap = {
@@ -46,7 +46,9 @@ const rpcUrls = {
     'https://polygon-rpc.com',
     'https://polygon-mainnet.g.alchemy.com/v2/demo',
     'https://rpc-mainnet.matic.quiknode.pro',
-    'https://matic-mainnet.chainstacklabs.com'
+    'https://matic-mainnet.chainstacklabs.com',
+    'https://poly-mainnet.rpc.grove.city/v1/803a2461',
+    'https://polygon-mainnet.public.blastapi.io'
   ],
   base: [
     'https://mainnet.base.org',
@@ -59,27 +61,23 @@ const rpcUrls = {
     'https://rpc.ankr.com/eth',
     'https://ethereum.publicnode.com',
     'https://eth.llamarpc.com',
-    'https://eth-mainnet.g.alchemy.com/v2/demo',
-    'https://mainnet.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
+    'https://eth-mainnet.g.alchemy.com/v2/demo'
   ],
   optimism: [
     'https://mainnet.optimism.io',
     'https://rpc.ankr.com/optimism',
     'https://optimism.publicnode.com',
-    'https://optimism-mainnet.g.alchemy.com/v2/demo',
-    'https://rpc.ankr.com/optimism-mainnet'
+    'https://optimism-mainnet.g.alchemy.com/v2/demo'
   ],
   arbitrum: [
     'https://arb1.arbitrum.io/rpc',
     'https://rpc.ankr.com/arbitrum',
     'https://arbitrum.publicnode.com',
-    'https://arbitrum-mainnet.g.alchemy.com/v2/demo',
-    'https://rpc.ankr.com/arbitrum-mainnet'
+    'https://arbitrum-mainnet.g.alchemy.com/v2/demo'
   ],
   sepolia: [
     'https://rpc.sepolia.org',
-    'https://rpc.ankr.com/eth_sepolia',
-    'https://sepolia.infura.io/v3/YOUR_INFURA_KEY' // Ganti kalau punya
+    'https://rpc.ankr.com/eth_sepolia'
   ],
   bsc_testnet: [
     'https://data-seed-prebsc-1-s1.binance.org:8545/',
@@ -100,8 +98,7 @@ const rpcUrls = {
     'https://api.mainnet-beta.solana.com',
     'https://rpc.ankr.com/solana',
     'https://solana-mainnet.g.alchemy.com/v2/demo',
-    'https://solana-mainnet.rpc.extrnode.com',
-    'https://rpc.ankr.com/solana-mainnet'
+    'https://solana-mainnet.rpc.extrnode.com'
   ]
 };
 
@@ -125,7 +122,7 @@ const apiKeys = {
     'GEJUTZUV2C459NTIA3Y3WRFVJXY3D4C2AH',
     '8NDC7ERUFFHRTXEVRSXKCNKHN58XHFURV8'
   ],
-  avax: ['YOUR_SNOWTRACE_API_KEY_1'], // Ganti kalau punya
+  avax: ['YOUR_SNOWTRACE_API_KEY_1'],
   matic: [
     'KQ43QA1YT3A6F2DPXHAY899SQVVXS8PX1K',
     'EB22YZFWMJVNC6EF19E8TH3U6H5DJXPWW6',
@@ -154,7 +151,7 @@ const apiKeys = {
   sepolia: ['IHINXYAP9Y5RI529JZD8DDN78GPZVVMIK8'],
   bsc_testnet: ['5DKFJ6AWWNQU7H766PGCCKPTXS32EYHE8M'],
   mumbai: ['KQ43QA1YT3A6F2DPXHAY899SQVVXS8PX1K'],
-  fuji: ['YOUR_FUJI_SNOWTRACE_API_KEY_1'] // Ganti kalau punya
+  fuji: ['YOUR_FUJI_SNOWTRACE_API_KEY_1']
 };
 
 const tokenAbi = [
@@ -188,24 +185,30 @@ const popularTokens = {
   ]
 };
 
-const getProvider = async (network) => {
+const getProvider = async (network, retries = 3) => {
   const mappedNetwork = networkMap[network] || network;
   const urls = rpcUrls[mappedNetwork] || [];
-  for (const url of urls) {
-    try {
-      const provider = new ethers.JsonRpcProvider(url);
-      await Promise.race([
-        provider.getBlockNumber(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('RPC timeout')), 5000))
-      ]);
-      console.log(`Connected to RPC: ${url}`);
-      return provider;
-    } catch (error) {
-      console.log(`Failed RPC ${url} for ${mappedNetwork}:`, error.message);
-      continue;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    for (const url of urls) {
+      try {
+        const provider = new ethers.JsonRpcProvider(url);
+        await Promise.race([
+          provider.getBlockNumber(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('RPC timeout')), 7000))
+        ]);
+        console.log(`Connected to RPC: ${url} (attempt ${attempt})`);
+        return provider;
+      } catch (error) {
+        console.log(`Failed RPC ${url} for ${mappedNetwork} (attempt ${attempt}):`, error.message);
+        continue;
+      }
+    }
+    if (attempt < retries) {
+      console.log(`Retrying provider for ${mappedNetwork}...`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
-  throw new Error(`No available RPC for ${mappedNetwork}`);
+  throw new Error(`No available RPC for ${mappedNetwork} after ${retries} retries`);
 };
 
 const getApiKey = (network) => {
@@ -233,7 +236,7 @@ const getTokensFromExplorer = async (network, address) => {
         sort: 'desc',
         apikey: apiKey
       },
-      timeout: 10000
+      timeout: 15000
     });
 
     if (response.data.status === '1' && response.data.result) {
@@ -269,11 +272,20 @@ const getTokensFromExplorer = async (network, address) => {
   }
 };
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 app.get('/getBalance', async (req, res) => {
   const { address, network, contracts } = req.query;
   console.log(`Request received: address=${address}, network=${network}, contracts=${contracts}`);
 
   try {
+    if (!address || !network) {
+      throw new Error('Missing address or network');
+    }
+
     if (network === 'sol') {
       let solanaConnection;
       for (const url of rpcUrls.sol) {
